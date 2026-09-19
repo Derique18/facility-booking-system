@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            Role          @default(USER)
+  refreshToken    String?       @db.Text
+  otpCode         String?
+  otpExpiresAt    DateTime?
+  bookings        Booking[]
+  facilities      Facility[]    @relation("AdminFacilities")
+  blockedSlots    BlockedSlot[] @relation("AdminBlockedSlots")
+  waitlistEntries Waitlist[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Facility {
+  id              String        @id @default(uuid())
+  name            String
+  description     String?
+  category        String
+  location        String?       @default("Main Campus")
+  capacity        Int?          @default(0)
+  openTime        String        @default("09:00") // Operating start time (e.g. "09:00")
+  closeTime       String        @default("18:00") // Operating end time (e.g. "18:00" or "23:59")
+  createdById     String?
+  createdBy       User?         @relation("AdminFacilities", fields: [createdById], references: [id], onDelete: SetNull)
+  bookings        Booking[]
+  blockedSlots    BlockedSlot[]
+  waitlistEntries Waitlist[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Booking {
+  id                String        @id @default(uuid())
+  userId            String
+  facilityId        String
+  date              DateTime
+  startTime         String        // e.g., "2026-09-05T09:00:00.000Z"
+  endTime           String        // e.g., "2026-09-05T11:00:00.000Z"
+  status            BookingStatus @default(PENDING)
+  startReminderSent Boolean       @default(false)
+  endReminderSent   Boolean       @default(false)
+  expiredSent       Boolean       @default(false)
+  user              User          @relation(fields: [userId], references: [id])
+  facility          Facility      @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model BlockedSlot {
+  id         String   @id @default(uuid())
+  facilityId String
+  adminId    String
+  date       DateTime
+  startTime  String   // e.g., "2026-09-05T09:00:00.000Z"
+  endTime    String   // e.g., "2026-09-05T11:00:00.000Z"
+  reason     String?  // Optional maintenance reason
+  
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  admin      User     @relation("AdminBlockedSlots", fields: [adminId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Waitlist {
+  id         String   @id @default(uuid())
+  userId     String
+  facilityId String
+  date       DateTime
+  startTime  String   // e.g., "2026-09-05T09:00:00.000Z"
+  endTime    String   // e.g., "2026-09-05T11:00:00.000Z"
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("waitlists")
+}
